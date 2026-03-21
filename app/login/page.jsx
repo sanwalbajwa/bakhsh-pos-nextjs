@@ -219,7 +219,7 @@ export default function LoginPage() {
                     </div>
                     <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold mb-3 sm:mb-4
                                  drop-shadow-lg tracking-tight">
-                        Bakhsh POS
+                        Bakhsh
                     </h2>
                     <p className="text-lg sm:text-xl lg:text-2xl font-light opacity-90 mb-6 sm:mb-8">
                         Healthcare Management System
