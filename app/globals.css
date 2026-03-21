@@ -1,8 +1,11 @@
-@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800;900&display=swap');
-
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+:root {
+  --font-ui: var(--font-ibm-plex-sans);
+  --font-data: var(--font-ibm-plex-mono);
+}
 
 * {
   margin: 0;
@@ -11,5 +14,13 @@
 }
 
 body {
-  font-family: 'Poppins', sans-serif;
+  font-family: var(--font-ui), 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
+}
+
+/* Use monospace numeric style for currency, totals, IDs, and tabular values. */
+.numeric,
+[data-numeric='true'] {
+  font-family: var(--font-data), 'Consolas', 'Courier New', monospace;
+  font-variant-numeric: tabular-nums;
 }

@@ -1,6 +1,6 @@
 'use client'
 
-export default function DeleteConfirmModal({ isOpen, onClose, onConfirm, productName, loading }) {
+export default function DeleteConfirmModal({ isOpen, onClose, onConfirm, productName, loading, error }) {
     if (!isOpen) return null
 
     return (
@@ -21,6 +21,12 @@ export default function DeleteConfirmModal({ isOpen, onClose, onConfirm, product
                     </div>
                 </div>
                 <div className="px-6 py-4">
+                    {error && (
+                        <div className="p-3 bg-red-50 border border-red-200 rounded-lg mb-4">
+                            <p className="text-sm text-red-700 font-medium">Error:</p>
+                            <p className="text-sm text-red-600 mt-1">{error}</p>
+                        </div>
+                    )}
                     <p className="text-gray-700">
                         Are you sure you want to delete{' '}
                         <span className="font-semibold text-gray-900">&quot;{productName}&quot;</span>?

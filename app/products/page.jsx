@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
 import ProtectedRoute from '@/components/ProtectedRoute'
 import DashboardLayout from '@/components/DashboardLayout'
@@ -11,27 +11,44 @@ import { Search, Plus, Edit, Trash2, Package, AlertTriangle, CheckCircle } from 
 export default function ProductsPage() {
     const [products, setProducts] = useState([])
     const [loading, setLoading] = useState(true)
+    const [loadError, setLoadError] = useState('')
     const [searchTerm, setSearchTerm] = useState('')
     const [showProductModal, setShowProductModal] = useState(false)
     const [showDeleteModal, setShowDeleteModal] = useState(false)
     const [editingProduct, setEditingProduct] = useState(null)
     const [deletingProduct, setDeletingProduct] = useState(null)
     const [modalLoading, setModalLoading] = useState(false)
+    const [modalError, setModalError] = useState('')
 
-    const fetchProducts = async () => {
+    const withTimeout = (promise, timeoutMs = 12000) => {
+        return Promise.race([
+            promise,
+            new Promise((_, reject) => {
+                setTimeout(() => reject(new Error('Request timeout. Please check your network or permissions.')), timeoutMs)
+            }),
+        ])
+    }
+
+    const fetchProducts = useCallback(async () => {
         try {
             setLoading(true)
-            const { data, error } = await supabase
-                .from('products').select('*').order('created_at', { ascending: false })
+            setLoadError('')
+            const { data, error } = await withTimeout(
+                supabase
+                    .from('products')
+                    .select('*')
+                    .order('created_at', { ascending: false })
+            )
             if (error) throw error
             setProducts(data || [])
         } catch (error) {
             console.error('Error fetching products:', error)
-            alert('Failed to fetch products')
+            setProducts([])
+            setLoadError(error.message || 'Failed to fetch products')
         } finally { setLoading(false) }
-    }
+    }, [])
 
-    useEffect(() => { fetchProducts() }, [])
+    useEffect(() => { fetchProducts() }, [fetchProducts])
 
     const filteredProducts = products.filter(product =>
         product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -42,53 +59,66 @@ export default function ProductsPage() {
     const handleAddProduct = async (formData) => {
         try {
             setModalLoading(true)
-            const { error } = await supabase.from('products').insert([{
-                ...formData,
-                price: parseFloat(formData.price),
-                cost_price: formData.cost_price ? parseFloat(formData.cost_price) : null,
-                stock: parseInt(formData.stock),
-                reorder_level: parseInt(formData.reorder_level),
-            }])
+            setModalError('')
+            const { error } = await withTimeout(
+                supabase.from('products').insert([{
+                    ...formData,
+                    price: parseFloat(formData.price),
+                    cost_price: formData.cost_price ? parseFloat(formData.cost_price) : null,
+                    stock: parseInt(formData.stock),
+                    reorder_level: parseInt(formData.reorder_level),
+                }])
+            )
             if (error) throw error
             await fetchProducts()
             setShowProductModal(false)
-            alert('Product added successfully!')
+            setEditingProduct(null)
+            setModalError('')
         } catch (error) {
-            alert(error.message || 'Failed to add product')
+            console.error('Add product error:', error)
+            setModalError(error.message || 'Failed to add product. Please check your permissions or network connection.')
         } finally { setModalLoading(false) }
     }
 
     const handleUpdateProduct = async (formData) => {
         try {
             setModalLoading(true)
-            const { error } = await supabase.from('products').update({
-                ...formData,
-                price: parseFloat(formData.price),
-                cost_price: formData.cost_price ? parseFloat(formData.cost_price) : null,
-                stock: parseInt(formData.stock),
-                reorder_level: parseInt(formData.reorder_level),
-            }).eq('id', editingProduct.id)
+            setModalError('')
+            const { error } = await withTimeout(
+                supabase.from('products').update({
+                    ...formData,
+                    price: parseFloat(formData.price),
+                    cost_price: formData.cost_price ? parseFloat(formData.cost_price) : null,
+                    stock: parseInt(formData.stock),
+                    reorder_level: parseInt(formData.reorder_level),
+                }).eq('id', editingProduct.id)
+            )
             if (error) throw error
             await fetchProducts()
             setShowProductModal(false)
             setEditingProduct(null)
-            alert('Product updated successfully!')
+            setModalError('')
         } catch (error) {
-            alert(error.message || 'Failed to update product')
+            console.error('Update product error:', error)
+            setModalError(error.message || 'Failed to update product. Please check your permissions or network connection.')
         } finally { setModalLoading(false) }
     }
 
     const handleDeleteProduct = async () => {
         try {
             setModalLoading(true)
-            const { error } = await supabase.from('products').delete().eq('id', deletingProduct.id)
+            setModalError('')
+            const { error } = await withTimeout(
+                supabase.from('products').delete().eq('id', deletingProduct.id)
+            )
             if (error) throw error
             await fetchProducts()
             setShowDeleteModal(false)
             setDeletingProduct(null)
-            alert('Product deleted successfully!')
+            setModalError('')
         } catch (error) {
-            alert('Failed to delete product')
+            console.error('Delete product error:', error)
+            setModalError(error.message || 'Failed to delete product. Please check your permissions or network connection.')
         } finally { setModalLoading(false) }
     }
 
@@ -120,6 +150,17 @@ export default function ProductsPage() {
                         {loading ? (
                             <div className="flex items-center justify-center py-12">
                                 <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+                            </div>
+                        ) : loadError ? (
+                            <div className="text-center py-12 px-6">
+                                <p className="text-red-600 font-semibold">Unable to load products</p>
+                                <p className="text-sm text-gray-600 mt-2">{loadError}</p>
+                                <button
+                                    onClick={fetchProducts}
+                                    className="mt-4 px-5 py-2.5 bg-primary hover:bg-secondary text-white font-semibold rounded-lg transition-colors"
+                                >
+                                    Retry
+                                </button>
                             </div>
                         ) : filteredProducts.length === 0 ? (
                             <div className="text-center py-12"><p className="text-gray-500">No products found</p></div>
@@ -201,11 +242,11 @@ export default function ProductsPage() {
                     </div>
                 </div>
 
-                <ProductModal isOpen={showProductModal} onClose={() => { setShowProductModal(false); setEditingProduct(null) }}
+                <ProductModal isOpen={showProductModal} onClose={() => { setShowProductModal(false); setEditingProduct(null); setModalError('') }}
                     onSubmit={editingProduct ? handleUpdateProduct : handleAddProduct}
-                    product={editingProduct} loading={modalLoading} />
-                <DeleteConfirmModal isOpen={showDeleteModal} onClose={() => { setShowDeleteModal(false); setDeletingProduct(null) }}
-                    onConfirm={handleDeleteProduct} productName={deletingProduct?.name} loading={modalLoading} />
+                    product={editingProduct} loading={modalLoading} error={modalError} />
+                <DeleteConfirmModal isOpen={showDeleteModal} onClose={() => { setShowDeleteModal(false); setDeletingProduct(null); setModalError('') }}
+                    onConfirm={handleDeleteProduct} productName={deletingProduct?.name} loading={modalLoading} error={modalError} />
             </DashboardLayout>
         </ProtectedRoute>
     )

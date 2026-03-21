@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 
-export default function ProductModal({ isOpen, onClose, onSubmit, product, loading }) {
+export default function ProductModal({ isOpen, onClose, onSubmit, product, loading, error }) {
     const [formData, setFormData] = useState({
         name: '', generic_name: '', sku: '', barcode: '', description: '',
         price: '', cost_price: '', stock: '', reorder_level: '10',
@@ -63,6 +63,13 @@ export default function ProductModal({ isOpen, onClose, onSubmit, product, loadi
                         </svg>
                     </button>
                 </div>
+
+                {error && (
+                    <div className="mx-6 mt-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+                        <p className="text-sm text-red-700 font-medium">Error:</p>
+                        <p className="text-sm text-red-600 mt-1">{error}</p>
+                    </div>
+                )}
 
                 <form onSubmit={handleSubmit} className="px-6 py-4">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-h-[60vh] overflow-y-auto pr-2">

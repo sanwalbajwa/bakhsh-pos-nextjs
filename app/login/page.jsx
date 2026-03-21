@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/context/AuthContext'
 
@@ -10,8 +10,21 @@ export default function LoginPage() {
     const [error, setError] = useState('')
     const [loading, setLoading] = useState(false)
 
-    const { login } = useAuth()
+    const { user, login, loading: authLoading } = useAuth()
     const router = useRouter()
+
+    useEffect(() => {
+        if (authLoading || !user) return
+
+        if (user.role === 'admin') {
+            router.replace('/dashboard')
+            return
+        }
+
+        if (user.role === 'pharmacist') {
+            router.replace('/pos')
+        }
+    }, [user, authLoading, router])
 
     const handleSubmit = async (e) => {
         e.preventDefault()

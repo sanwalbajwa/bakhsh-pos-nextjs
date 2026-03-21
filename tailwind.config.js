@@ -14,7 +14,8 @@ module.exports = {
         accent: '#ffffff',
       },
       fontFamily: {
-        sans: ['Poppins', 'Inter', 'system-ui', 'sans-serif'],
+        sans: ['var(--font-ui)', 'Segoe UI', 'Tahoma', 'Verdana', 'sans-serif'],
+        mono: ['var(--font-data)', 'Consolas', 'Courier New', 'monospace'],
       },
       keyframes: {
         float: {
