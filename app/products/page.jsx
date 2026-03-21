@@ -60,14 +60,16 @@ export default function ProductsPage() {
         try {
             setModalLoading(true)
             setModalError('')
+            const payload = {
+                ...formData,
+                price: parseFloat(formData.price),
+                cost_price: formData.cost_price ? parseFloat(formData.cost_price) : null,
+                stock: parseInt(formData.stock),
+                reorder_level: parseInt(formData.reorder_level),
+                expiry_date: formData.expiry_date ? formData.expiry_date : null,
+            }
             const { error } = await withTimeout(
-                supabase.from('products').insert([{
-                    ...formData,
-                    price: parseFloat(formData.price),
-                    cost_price: formData.cost_price ? parseFloat(formData.cost_price) : null,
-                    stock: parseInt(formData.stock),
-                    reorder_level: parseInt(formData.reorder_level),
-                }])
+                supabase.from('products').insert([payload])
             )
             if (error) throw error
             await fetchProducts()
@@ -84,14 +86,16 @@ export default function ProductsPage() {
         try {
             setModalLoading(true)
             setModalError('')
+            const payload = {
+                ...formData,
+                price: parseFloat(formData.price),
+                cost_price: formData.cost_price ? parseFloat(formData.cost_price) : null,
+                stock: parseInt(formData.stock),
+                reorder_level: parseInt(formData.reorder_level),
+                expiry_date: formData.expiry_date ? formData.expiry_date : null,
+            }
             const { error } = await withTimeout(
-                supabase.from('products').update({
-                    ...formData,
-                    price: parseFloat(formData.price),
-                    cost_price: formData.cost_price ? parseFloat(formData.cost_price) : null,
-                    stock: parseInt(formData.stock),
-                    reorder_level: parseInt(formData.reorder_level),
-                }).eq('id', editingProduct.id)
+                supabase.from('products').update(payload).eq('id', editingProduct.id)
             )
             if (error) throw error
             await fetchProducts()
