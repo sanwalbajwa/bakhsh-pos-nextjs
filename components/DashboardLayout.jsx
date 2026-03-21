@@ -13,8 +13,12 @@ export default function DashboardLayout({ children }) {
     const [sidebarOpen, setSidebarOpen] = useState(false)
 
     const handleLogout = async () => {
-        await logout()
-        router.push('/login')
+        try {
+            await logout()
+        } finally {
+            router.replace('/login')
+            router.refresh()
+        }
     }
 
     const menuItems = [

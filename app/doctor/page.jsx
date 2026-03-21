@@ -3,26 +3,26 @@
 import { useState } from 'react'
 import ProtectedRoute from '@/components/ProtectedRoute'
 import DashboardLayout from '@/components/DashboardLayout'
-import { ShoppingCart, History, Package, Users } from 'lucide-react'
+import { Stethoscope, Users, FileText, Calendar } from 'lucide-react'
 
-export default function POSPage() {
+export default function DoctorPage() {
     const [activeTab, setActiveTab] = useState('dashboard')
 
     const tabs = [
-        { id: 'dashboard', label: 'Dashboard', icon: ShoppingCart },
-        { id: 'transactions', label: 'Transactions', icon: History },
-        { id: 'inventory', label: 'Inventory', icon: Package },
-        { id: 'customers', label: 'Customers', icon: Users },
+        { id: 'dashboard', label: 'Dashboard', icon: Stethoscope },
+        { id: 'patients', label: 'Patients', icon: Users },
+        { id: 'prescriptions', label: 'Prescriptions', icon: FileText },
+        { id: 'appointments', label: 'Appointments', icon: Calendar },
     ]
 
     return (
-        <ProtectedRoute allowedRoles={['admin', 'pharmacist']}>
+        <ProtectedRoute allowedRoles={['doctor']}>
             <DashboardLayout>
                 <div className="space-y-6">
                     {/* Header */}
                     <div>
-                        <h1 className="text-3xl font-bold text-gray-900">POS System</h1>
-                        <p className="text-gray-600 mt-1">Manage sales and inventory</p>
+                        <h1 className="text-3xl font-bold text-gray-900">Doctor Dashboard</h1>
+                        <p className="text-gray-600 mt-1">Manage patients and prescriptions</p>
                     </div>
 
                     {/* Tabs */}
@@ -51,61 +51,61 @@ export default function POSPage() {
                     <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
                         {activeTab === 'dashboard' && (
                             <div className="space-y-6">
-                                <h2 className="text-xl font-semibold text-gray-900">Sales Dashboard</h2>
+                                <h2 className="text-xl font-semibold text-gray-900">Today&apos;s Overview</h2>
                                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                                     <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-lg p-6">
-                                        <p className="text-sm text-blue-600 font-medium">Today&apos;s Sales</p>
-                                        <p className="text-3xl font-bold text-blue-900 mt-2">Rs 0</p>
-                                        <p className="text-xs text-blue-600 mt-1">0 transactions</p>
+                                        <p className="text-sm text-blue-600 font-medium">Total Patients</p>
+                                        <p className="text-3xl font-bold text-blue-900 mt-2">0</p>
+                                        <p className="text-xs text-blue-600 mt-1">Registered</p>
                                     </div>
                                     <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-lg p-6">
-                                        <p className="text-sm text-green-600 font-medium">Total Revenue</p>
-                                        <p className="text-3xl font-bold text-green-900 mt-2">Rs 0</p>
-                                        <p className="text-xs text-green-600 mt-1">All time</p>
+                                        <p className="text-sm text-green-600 font-medium">Today&apos;s Appointments</p>
+                                        <p className="text-3xl font-bold text-green-900 mt-2">0</p>
+                                        <p className="text-xs text-green-600 mt-1">Scheduled</p>
                                     </div>
                                     <div className="bg-gradient-to-br from-orange-50 to-orange-100 rounded-lg p-6">
-                                        <p className="text-sm text-orange-600 font-medium">Active Orders</p>
+                                        <p className="text-sm text-orange-600 font-medium">Pending Prescriptions</p>
                                         <p className="text-3xl font-bold text-orange-900 mt-2">0</p>
-                                        <p className="text-xs text-orange-600 mt-1">Pending</p>
+                                        <p className="text-xs text-orange-600 mt-1">Awaiting review</p>
                                     </div>
                                     <div className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-lg p-6">
-                                        <p className="text-sm text-purple-600 font-medium">Avg. Order Value</p>
-                                        <p className="text-3xl font-bold text-purple-900 mt-2">Rs 0</p>
-                                        <p className="text-xs text-purple-600 mt-1">Per transaction</p>
+                                        <p className="text-sm text-purple-600 font-medium">Active Cases</p>
+                                        <p className="text-3xl font-bold text-purple-900 mt-2">0</p>
+                                        <p className="text-xs text-purple-600 mt-1">Under treatment</p>
                                     </div>
                                 </div>
                             </div>
                         )}
 
-                        {activeTab === 'transactions' && (
+                        {activeTab === 'patients' && (
                             <div className="space-y-4">
-                                <h2 className="text-xl font-semibold text-gray-900">Recent Transactions</h2>
-                                <div className="text-center py-12">
-                                    <History className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-                                    <p className="text-gray-500">No transactions yet</p>
-                                    <p className="text-sm text-gray-400 mt-1">Start creating sales to see them here</p>
-                                </div>
-                            </div>
-                        )}
-
-                        {activeTab === 'inventory' && (
-                            <div className="space-y-4">
-                                <h2 className="text-xl font-semibold text-gray-900">Inventory Status</h2>
-                                <div className="text-center py-12">
-                                    <Package className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-                                    <p className="text-gray-500">Inventory data loading</p>
-                                    <p className="text-sm text-gray-400 mt-1">Real-time inventory updates from products</p>
-                                </div>
-                            </div>
-                        )}
-
-                        {activeTab === 'customers' && (
-                            <div className="space-y-4">
-                                <h2 className="text-xl font-semibold text-gray-900">Customer Management</h2>
+                                <h2 className="text-xl font-semibold text-gray-900">Patient Records</h2>
                                 <div className="text-center py-12">
                                     <Users className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-                                    <p className="text-gray-500">No customers yet</p>
-                                    <p className="text-sm text-gray-400 mt-1">Customer records will appear here</p>
+                                    <p className="text-gray-500">No patients yet</p>
+                                    <p className="text-sm text-gray-400 mt-1">Patient records will appear here</p>
+                                </div>
+                            </div>
+                        )}
+
+                        {activeTab === 'prescriptions' && (
+                            <div className="space-y-4">
+                                <h2 className="text-xl font-semibold text-gray-900">Prescriptions</h2>
+                                <div className="text-center py-12">
+                                    <FileText className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+                                    <p className="text-gray-500">No prescriptions yet</p>
+                                    <p className="text-sm text-gray-400 mt-1">Issued prescriptions will appear here</p>
+                                </div>
+                            </div>
+                        )}
+
+                        {activeTab === 'appointments' && (
+                            <div className="space-y-4">
+                                <h2 className="text-xl font-semibold text-gray-900">Appointment Calendar</h2>
+                                <div className="text-center py-12">
+                                    <Calendar className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+                                    <p className="text-gray-500">No appointments scheduled</p>
+                                    <p className="text-sm text-gray-400 mt-1">Scheduled appointments will appear here</p>
                                 </div>
                             </div>
                         )}

@@ -8,7 +8,7 @@ const AuthContext = createContext(null)
 const normalizeRole = (role) => {
     if (!role || typeof role !== 'string') return null
     const value = role.toLowerCase()
-    if (value === 'admin' || value === 'pharmacist') return value
+    if (value === 'admin' || value === 'pharmacist' || value === 'doctor') return value
     return null
 }
 
@@ -23,7 +23,8 @@ const resolveRole = (authUser, profile) => {
     if (userMetaRole) return userMetaRole
 
     // Keep known admin account on admin flow even if profile row is missing.
-    if (authUser?.email?.toLowerCase() === 'admin@bakhshpos.com') return 'admin'
+    const email = authUser?.email?.toLowerCase()
+    if (email === 'admin@bakhsh.com' || email === 'admin@bakhshpos.com') return 'admin'
 
     return 'pharmacist'
 }
@@ -65,6 +66,25 @@ const buildAppUser = (authUser, profile) => ({
     role: resolveRole(authUser, profile),
 })
 
+const setAccessTokenCookie = (token) => {
+    if (typeof document === 'undefined') return
+    document.cookie = `sb-access-token=${token}; Path=/; Max-Age=3600; SameSite=Lax`
+}
+
+const clearAccessTokenCookie = () => {
+    if (typeof document === 'undefined') return
+    document.cookie = 'sb-access-token=; Path=/; Max-Age=0; SameSite=Lax'
+}
+
+const withTimeout = (promise, timeoutMs = 10000, fallbackValue = null) => {
+    return Promise.race([
+        promise,
+        new Promise((resolve) => {
+            setTimeout(() => resolve(fallbackValue), timeoutMs)
+        }),
+    ])
+}
+
 export function AuthProvider({ children }) {
     const [user, setUser] = useState(null)
     const [loading, setLoading] = useState(true)
@@ -80,12 +100,18 @@ export function AuthProvider({ children }) {
                 }
 
                 if (session?.user) {
-                    const profile = await fetchProfile(session.user)
+                    const profile = await withTimeout(fetchProfile(session.user), 8000, null)
                     setUser(buildAppUser(session.user, profile))
+                    if (session.access_token) {
+                        setAccessTokenCookie(session.access_token)
+                    }
+                } else {
+                    clearAccessTokenCookie()
                 }
             } catch (error) {
                 console.error('Unexpected getSession error:', error)
                 setUser(null)
+                clearAccessTokenCookie()
             } finally {
                 setLoading(false)
             }
@@ -94,11 +120,15 @@ export function AuthProvider({ children }) {
 
         const { data: { subscription } } = supabase.auth.onAuthStateChange(
             async (event, session) => {
-                if (event === 'SIGNED_IN' && session?.user) {
-                    const profile = await fetchProfile(session.user)
+                if ((event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED') && session?.user) {
+                    const profile = await withTimeout(fetchProfile(session.user), 8000, null)
                     setUser(buildAppUser(session.user, profile))
+                    if (session.access_token) {
+                        setAccessTokenCookie(session.access_token)
+                    }
                 } else if (event === 'SIGNED_OUT') {
                     setUser(null)
+                    clearAccessTokenCookie()
                 }
             }
         )
@@ -108,19 +138,32 @@ export function AuthProvider({ children }) {
     const login = async (email, password) => {
         const { data, error } = await supabase.auth.signInWithPassword({ email, password })
         if (error) throw error
-        const profile = await fetchProfile(data.user)
+        const profile = await withTimeout(fetchProfile(data.user), 8000, null)
         const userData = buildAppUser(data.user, profile)
         setUser(userData)
+        if (data.session?.access_token) {
+            setAccessTokenCookie(data.session.access_token)
+        }
         return userData
     }
 
     const logout = async () => {
-        await supabase.auth.signOut()
         setUser(null)
+        clearAccessTokenCookie()
+        try {
+            await withTimeout(supabase.auth.signOut(), 5000, null)
+        } catch (error) {
+            console.error('Logout request failed:', error)
+        }
+    }
+
+    const getAccessToken = async () => {
+        const { data: { session } } = await supabase.auth.getSession()
+        return session?.access_token || null
     }
 
     return (
-        <AuthContext.Provider value={{ user, login, logout, loading }}>
+        <AuthContext.Provider value={{ user, login, logout, loading, getAccessToken }}>
             {children}
         </AuthContext.Provider>
     )

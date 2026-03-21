@@ -1,14 +1,32 @@
-import { createClient } from '@supabase/supabase-js'
+import { getAuthenticatedUser, getUserRole, supabaseAdmin } from '@/lib/serverAuth'
 
-const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-)
-
-export async function GET() {
+export async function GET(request) {
     try {
+        const { user, error: authError } = await getAuthenticatedUser(request)
+        if (authError || !user) {
+            return Response.json(
+                { success: false, error: 'Unauthorized' },
+                { status: 401 }
+            )
+        }
+
+        const { role, error: roleError } = await getUserRole(user.id)
+        if (roleError) {
+            return Response.json(
+                { success: false, error: 'Unable to resolve user role' },
+                { status: 500 }
+            )
+        }
+
+        if (role !== 'admin') {
+            return Response.json(
+                { success: false, error: 'Forbidden' },
+                { status: 403 }
+            )
+        }
+
         // Get active products for stock metrics
-        const { data: activeProducts, error: productsError } = await supabase
+        const { data: activeProducts, error: productsError } = await supabaseAdmin
             .from('products')
             .select('id, name, stock, reorder_level')
             .eq('is_active', true)
@@ -21,7 +39,7 @@ export async function GET() {
         const totalProducts = activeProducts?.length || 0
 
         // Get total users count
-        const { count: totalUsers, error: usersError } = await supabase
+        const { count: totalUsers, error: usersError } = await supabaseAdmin
             .from('profiles')
             .select('*', { count: 'exact', head: true })
         if (usersError) {

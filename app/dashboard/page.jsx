@@ -1,9 +1,10 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Package, DollarSign, AlertTriangle, Users, TrendingUp, Clock } from 'lucide-react'
 import ProtectedRoute from '@/components/ProtectedRoute'
 import DashboardLayout from '@/components/DashboardLayout'
+import { useAuth } from '@/context/AuthContext'
 
 export default function DashboardPage() {
     const [stats, setStats] = useState({
@@ -15,25 +16,37 @@ export default function DashboardPage() {
         recentSales: []
     })
     const [loading, setLoading] = useState(true)
+    const { getAccessToken } = useAuth()
 
-    useEffect(() => {
-        fetchDashboardData()
-    }, [])
-
-    const fetchDashboardData = async () => {
+    const fetchDashboardData = useCallback(async () => {
         try {
-            const response = await fetch('/api/dashboard')
+            const accessToken = await getAccessToken()
+            if (!accessToken) {
+                throw new Error('No active session. Please sign in again.')
+            }
+
+            const response = await fetch('/api/dashboard', {
+                headers: {
+                    Authorization: `Bearer ${accessToken}`,
+                },
+            })
             const result = await response.json()
             
             if (result.success) {
                 setStats(result.data)
+            } else {
+                throw new Error(result.error || 'Failed to load dashboard data')
             }
         } catch (error) {
             console.error('Error fetching dashboard data:', error)
         } finally {
             setLoading(false)
         }
-    }
+    }, [getAccessToken])
+
+    useEffect(() => {
+        fetchDashboardData()
+    }, [fetchDashboardData])
 
     const StatCard = ({ icon: Icon, title, value, color, subtext }) => (
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 hover:shadow-md transition-shadow">
