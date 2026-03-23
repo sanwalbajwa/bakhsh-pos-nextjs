@@ -58,7 +58,7 @@ export default function DashboardLayout({ children, sidebarSections = [], active
                                 <span>{item.name}</span>
                             </Link>
                         )
-                    })}
+                    })} 
 
                     {sidebarSections.length > 0 && (
                         <div className="mt-4 pt-4 border-white/15 space-y-2">
