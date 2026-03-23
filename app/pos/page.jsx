@@ -17,8 +17,10 @@ import {
     AlertTriangle,
     CheckCircle,
     UserPlus,
+    Printer,
 } from 'lucide-react'
 import { useAuth } from '@/context/AuthContext'
+import { printReceipt } from '@/lib/printReceipt'
 
 export default function POSPage() {
     const [activeTab, setActiveTab] = useState('dashboard')
@@ -611,6 +613,7 @@ export default function POSPage() {
                                                     <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Payment</th>
                                                     <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Qty</th>
                                                     <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Total</th>
+                                                    <th className="px-4 py-3 text-right text-xs font-semibold text-gray-600 uppercase">Action</th>
                                                 </tr>
                                             </thead>
                                             <tbody className="divide-y divide-gray-200">
@@ -622,6 +625,15 @@ export default function POSPage() {
                                                         <td className="px-4 py-3 text-sm text-gray-600 capitalize">{item.payment_method?.replace('_', ' ')}</td>
                                                         <td className="px-4 py-3 text-sm text-gray-600">{item.quantity}</td>
                                                         <td className="px-4 py-3 text-sm font-semibold text-gray-900">Rs {Number(item.total || 0).toFixed(2)}</td>
+                                                        <td className="px-4 py-3 text-right">
+                                                            <button
+                                                                onClick={() => printReceipt(item)}
+                                                                className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors inline-flex items-center gap-1"
+                                                                title="Print Receipt"
+                                                            >
+                                                                <Printer className="w-4 h-4" />
+                                                            </button>
+                                                        </td>
                                                     </tr>
                                                 ))}
                                             </tbody>
@@ -701,9 +713,17 @@ export default function POSPage() {
                                                             <td className="px-4 py-3 text-sm text-gray-600">{product.category || 'N/A'}</td>
                                                             <td className="px-4 py-3 text-sm font-semibold text-gray-900">PKR {parseFloat(product.price || 0).toFixed(2)}</td>
                                                             <td className="px-4 py-3">
-                                                                <span className={`px-2.5 py-1 text-xs font-medium rounded-full ${product.stock <= product.reorder_level ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>
-                                                                    {product.stock} {product.unit}
-                                                                </span>
+                                                                <div className="flex flex-col items-start gap-1">
+                                                                    <span className={`px-2.5 py-1 text-xs font-medium rounded-full ${product.stock <= product.reorder_level ? 'bg-red-100 text-red-700' : product.stock <= (product.reorder_level || 10) * 1.5 ? 'bg-yellow-100 text-yellow-700' : 'bg-green-100 text-green-700'}`}>
+                                                                        {product.stock} {product.unit}
+                                                                    </span>
+                                                                    {product.stock <= product.reorder_level && (
+                                                                        <span className="flex items-center gap-1 text-xs text-red-600 font-semibold">
+                                                                            <AlertTriangle className="w-3 h-3" />
+                                                                            Critical
+                                                                        </span>
+                                                                    )}
+                                                                </div>
                                                             </td>
                                                             <td className="px-4 py-3">
                                                                 <span className={`px-2.5 py-1 text-xs font-medium rounded-full ${product.is_active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-700'}`}>

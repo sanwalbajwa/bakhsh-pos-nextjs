@@ -18,7 +18,7 @@ export async function GET(request) {
             )
         }
 
-        if (role !== 'admin') {
+        if (role !== 'admin' && role !== 'pharmacist') {
             return Response.json(
                 { success: false, error: 'Forbidden' },
                 { status: 403 }
