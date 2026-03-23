@@ -6,7 +6,7 @@ import { useRouter, usePathname } from 'next/navigation'
 import Link from 'next/link'
 import { LayoutDashboard, Package, ShoppingCart, FileBarChart, Menu, X, LogOut } from 'lucide-react'
 
-export default function DashboardLayout({ children }) {
+export default function DashboardLayout({ children, sidebarSections = [], activeSection, onSectionChange, title }) {
     const { user, logout } = useAuth()
     const router = useRouter()
     const pathname = usePathname()
@@ -24,11 +24,11 @@ export default function DashboardLayout({ children }) {
     const menuItems = [
         { name: 'Dashboard', icon: LayoutDashboard, path: '/dashboard', roles: ['admin'] },
         { name: 'Products', icon: Package, path: '/products', roles: ['admin'] },
-        { name: 'POS', icon: ShoppingCart, path: '/pos', roles: ['admin', 'pharmacist'] },
         { name: 'Reports', icon: FileBarChart, path: '/reports', roles: ['admin'] },
     ]
 
     const filteredMenu = menuItems.filter(item => item.roles.includes(user?.role))
+    const pageTitle = title || filteredMenu.find(item => item.path === pathname)?.name || 'Dashboard'
 
     return (
         <div className="flex h-screen bg-gray-50">
@@ -59,6 +59,32 @@ export default function DashboardLayout({ children }) {
                             </Link>
                         )
                     })}
+
+                    {sidebarSections.length > 0 && (
+                        <div className="mt-4 pt-4 border-white/15 space-y-2">
+                            {sidebarSections.map((section) => {
+                                const SectionIcon = section.icon
+                                const isActiveSection = activeSection === section.id
+                                return (
+                                    <button
+                                        key={section.id}
+                                        onClick={() => {
+                                            onSectionChange?.(section.id)
+                                            setSidebarOpen(false)
+                                        }}
+                                        className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-lg text-left font-medium transition-all duration-200 ${
+                                            isActiveSection
+                                                ? 'bg-white text-primary shadow-lg'
+                                                : 'text-white/90 hover:bg-white/10'
+                                        }`}
+                                    >
+                                        {SectionIcon ? <SectionIcon className="w-4 h-4" /> : null}
+                                        <span>{section.label}</span>
+                                    </button>
+                                )
+                            })}
+                        </div>
+                    )}
                 </nav>
                 <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-white/10">
                     <div className="flex items-center gap-3 px-3 py-2 bg-white/10 rounded-lg">
@@ -85,7 +111,7 @@ export default function DashboardLayout({ children }) {
                         {sidebarOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
                     </button>
                     <h1 className="text-xl font-bold text-gray-800 hidden lg:block">
-                        {filteredMenu.find(item => item.path === pathname)?.name || 'Dashboard'}
+                        {pageTitle}
                     </h1>
                     <div className="flex items-center gap-4">
                         <div className="hidden sm:block text-right">
