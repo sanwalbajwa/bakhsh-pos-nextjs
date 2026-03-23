@@ -4,7 +4,7 @@ import { createClient } from '@supabase/supabase-js'
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 
-const protectedPrefixes = ['/dashboard', '/products', '/reports', '/pos', '/doctor']
+const protectedPrefixes = ['/dashboard', '/products', '/reports', '/pos', '/doctor', '/users']
 
 const isProtectedPath = (pathname) => {
     return protectedPrefixes.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`))
@@ -54,5 +54,5 @@ export async function middleware(request) {
 }
 
 export const config = {
-    matcher: ['/login', '/dashboard/:path*', '/products/:path*', '/reports/:path*', '/pos/:path*', '/doctor/:path*'],
+    matcher: ['/login', '/dashboard/:path*', '/products/:path*', '/reports/:path*', '/pos/:path*', '/doctor/:path*', '/users/:path*'],
 }

@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { useAuth } from '@/context/AuthContext'
 import { useRouter, usePathname } from 'next/navigation'
 import Link from 'next/link'
-import { LayoutDashboard, Package, ShoppingCart, FileBarChart, Menu, X, LogOut } from 'lucide-react'
+import { LayoutDashboard, Package, ShoppingCart, FileBarChart, Users, Menu, X, LogOut } from 'lucide-react'
 
 export default function DashboardLayout({ children, sidebarSections = [], activeSection, onSectionChange, title }) {
     const { user, logout } = useAuth()
@@ -25,6 +25,7 @@ export default function DashboardLayout({ children, sidebarSections = [], active
         { name: 'Dashboard', icon: LayoutDashboard, path: '/dashboard', roles: ['admin'] },
         { name: 'Products', icon: Package, path: '/products', roles: ['admin'] },
         { name: 'Reports', icon: FileBarChart, path: '/reports', roles: ['admin'] },
+        { name: 'Users', icon: Users, path: '/users', roles: ['admin'] },
     ]
 
     const filteredMenu = menuItems.filter(item => item.roles.includes(user?.role))
