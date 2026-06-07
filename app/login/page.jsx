@@ -209,19 +209,11 @@ export default function LoginPage() {
                           relative overflow-hidden
                           order-1 lg:order-2
                           min-h-[300px] sm:min-h-[400px] lg:min-h-screen">
-                <div className="absolute top-5 sm:top-10 right-5 sm:right-10
-                              w-48 sm:w-72 h-48 sm:h-72
-                              bg-white/10 rounded-full blur-3xl animate-pulse"></div>
-                <div className="absolute bottom-5 sm:bottom-10 left-5 sm:left-10
-                              w-64 sm:w-96 h-64 sm:h-96
-                              bg-secondary/30 rounded-full blur-3xl animate-pulse delay-700"></div>
                 <div className="text-center text-white relative z-10 w-full">
-                    <div className="mb-6 sm:mb-8 lg:mb-10 animate-float">
-                        <div className="bg-white/10 backdrop-blur-sm rounded-2xl sm:rounded-3xl
-                                      p-4 sm:p-6 lg:p-8 inline-block
-                                      shadow-2xl border border-white/20">
+                    <div className="mb-6 sm:mb-8 lg:mb-10">
+                        <div className="inline-block">
                             <img src="/bakhsh-logo.jpg" alt="Bakhsh Healthcare Center"
-                                className="w-48 sm:w-56 lg:w-72 h-auto drop-shadow-2xl" />
+                                className="w-48 sm:w-56 lg:w-72 h-auto" />
                         </div>
                     </div>
                     <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold mb-3 sm:mb-4

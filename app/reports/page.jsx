@@ -25,6 +25,7 @@ export default function ReportsPage() {
     const [endDate, setEndDate] = useState(new Date().toISOString().split('T')[0])
 
     const [salesData, setSalesData] = useState([])
+    const [returnsData, setReturnsData] = useState([])
     const [productsData, setProductsData] = useState([])
     const [customersData, setCustomersData] = useState([])
     const [loading, setLoading] = useState(false)
@@ -59,13 +60,15 @@ export default function ReportsPage() {
             setLoading(true)
             setError('')
 
-            const [salesPayload, productsPayload, customersPayload] = await Promise.all([
+            const [salesPayload, returnsPayload, productsPayload, customersPayload] = await Promise.all([
                 apiRequest('/api/transactions'),
+                apiRequest('/api/returns'),
                 apiRequest('/api/products'),
                 apiRequest('/api/customers'),
             ])
 
             setSalesData(salesPayload?.data || [])
+            setReturnsData(returnsPayload?.data || [])
             setProductsData(productsPayload?.data || [])
             setCustomersData(customersPayload?.data || [])
         } catch (err) {
@@ -85,28 +88,37 @@ export default function ReportsPage() {
         const txDate = new Date(t.created_at).toISOString().split('T')[0]
         return txDate >= startDate && txDate <= endDate
     })
+    const filteredReturns = returnsData.filter((item) => {
+        const returnDate = new Date(item.created_at).toISOString().split('T')[0]
+        return item.status === 'completed' && returnDate >= startDate && returnDate <= endDate
+    })
+    const returnedTransactionIds = new Set(filteredReturns.map((item) => item.transaction_id))
+    const netSales = filteredSales.filter((sale) => !returnedTransactionIds.has(sale.id))
+    const returnedRevenue = filteredReturns.reduce((sum, item) => sum + (parseFloat(item.amount) || 0), 0)
+    const grossRevenue = filteredSales.reduce((sum, t) => sum + (parseFloat(t.total) || 0), 0)
 
     // Sales Performance Calculations
     const salesMetrics = {
-        totalRevenue: filteredSales.reduce((sum, t) => sum + (parseFloat(t.total) || 0), 0),
-        totalTransactions: filteredSales.length,
-        avgOrderValue: filteredSales.length > 0 ? filteredSales.reduce((sum, t) => sum + (parseFloat(t.total) || 0), 0) / filteredSales.length : 0,
-        totalDiscount: filteredSales.reduce((sum, t) => sum + (parseFloat(t.discount) || 0), 0),
+        totalRevenue: Math.max(grossRevenue - returnedRevenue, 0),
+        returnedRevenue,
+        totalTransactions: netSales.length,
+        avgOrderValue: netSales.length > 0 ? netSales.reduce((sum, t) => sum + (parseFloat(t.total) || 0), 0) / netSales.length : 0,
+        totalDiscount: netSales.reduce((sum, t) => sum + (parseFloat(t.discount) || 0), 0),
     }
 
     // Payment Method Breakdown
     const paymentMethods = {}
-    filteredSales.forEach((t) => {
+    netSales.forEach((t) => {
         const method = t.payment_method || 'unknown'
         paymentMethods[method] = (paymentMethods[method] || 0) + (parseFloat(t.total) || 0)
     })
 
     // Top Selling Products
     const productSales = {}
-    filteredSales.forEach((t) => {
+    netSales.forEach((t) => {
         const productId = t.product_id
         if (!productSales[productId]) {
-            productSales[productId] = { name: t.product_name || 'Unknown', qty: 0, revenue: 0 }
+            productSales[productId] = { name: t.product_name || t.products?.name || 'Unknown', qty: 0, revenue: 0 }
         }
         productSales[productId].qty += parseInt(t.quantity) || 0
         productSales[productId].revenue += parseFloat(t.total) || 0
@@ -129,7 +141,7 @@ export default function ReportsPage() {
     const customerMetrics = {
         totalCustomers: customersData.length,
         activeCustomers: customersData.filter((c) => {
-            const hasRecent = filteredSales.some((t) => t.customer_id === c.id)
+            const hasRecent = netSales.some((t) => t.customer_id === c.id)
             return hasRecent
         }).length,
         avgCustomerValue: 0,
@@ -137,9 +149,9 @@ export default function ReportsPage() {
 
     if (customerMetrics.activeCustomers > 0) {
         const activeCustomerIds = new Set(
-            filteredSales.filter((t) => t.customer_id).map((t) => t.customer_id)
+            netSales.filter((t) => t.customer_id).map((t) => t.customer_id)
         )
-        const activeRevenue = filteredSales
+        const activeRevenue = netSales
             .filter((t) => activeCustomerIds.has(t.customer_id))
             .reduce((sum, t) => sum + (parseFloat(t.total) || 0), 0)
         customerMetrics.avgCustomerValue = activeRevenue / activeCustomerIds.size || 0
@@ -147,7 +159,7 @@ export default function ReportsPage() {
 
     // Top Customers
     const customerSales = {}
-    filteredSales.forEach((t) => {
+    netSales.forEach((t) => {
         if (t.customer_id) {
             if (!customerSales[t.customer_id]) {
                 customerSales[t.customer_id] = { name: t.customer_name || 'Unknown', purchases: 0, total: 0 }
@@ -252,7 +264,7 @@ export default function ReportsPage() {
                             </div>
                             <button
                                 onClick={() => exportToCSV(
-                                    filteredSales.map(t => ({ Date: t.created_at?.split('T')[0], Product: t.product_name, Quantity: t.quantity, 'Unit Price': t.unit_price, Discount: t.discount, Total: t.total, 'Payment Method': t.payment_method })),
+                                    filteredSales.map(t => ({ Date: t.created_at?.split('T')[0], Product: t.product_name || t.products?.name || 'Product', Quantity: t.quantity, 'Unit Price': t.unit_price, Discount: t.discount, Total: t.total, 'Payment Method': t.payment_method })),
                                     'sales-report',
                                     ['Date', 'Product', 'Quantity', 'Unit Price', 'Discount', 'Total', 'Payment Method']
                                 )}
@@ -265,7 +277,7 @@ export default function ReportsPage() {
 
                         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                             <div className="bg-white rounded-lg border border-gray-200 p-6">
-                                <p className="text-sm text-gray-600 mb-1">Total Revenue</p>
+                                <p className="text-sm text-gray-600 mb-1">Net Revenue</p>
                                 <p className="text-2xl font-bold text-gray-900">Rs {salesMetrics.totalRevenue.toLocaleString('en-PK', { maximumFractionDigits: 0 })}</p>
                             </div>
                             <div className="bg-white rounded-lg border border-gray-200 p-6">
@@ -277,8 +289,8 @@ export default function ReportsPage() {
                                 <p className="text-2xl font-bold text-gray-900">Rs {salesMetrics.avgOrderValue.toLocaleString('en-PK', { maximumFractionDigits: 0 })}</p>
                             </div>
                             <div className="bg-white rounded-lg border border-gray-200 p-6">
-                                <p className="text-sm text-gray-600 mb-1">Total Discount</p>
-                                <p className="text-2xl font-bold text-gray-900">Rs {salesMetrics.totalDiscount.toLocaleString('en-PK', { maximumFractionDigits: 0 })}</p>
+                                <p className="text-sm text-gray-600 mb-1">Returned Revenue</p>
+                                <p className="text-2xl font-bold text-red-600">Rs {salesMetrics.returnedRevenue.toLocaleString('en-PK', { maximumFractionDigits: 0 })}</p>
                             </div>
                         </div>
 

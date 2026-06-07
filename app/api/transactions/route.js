@@ -12,9 +12,29 @@ const normalizeTransactionPayload = (body = {}) => ({
     notes: body.notes ? String(body.notes).trim() : null,
 })
 
+const normalizeCartPayload = (body = {}) => {
+    const shared = {
+        customer_id: body.customerId || null,
+        customer_name: body.customerName ? String(body.customerName).trim() : null,
+        payment_method: String(body.paymentMethod || 'cash').toLowerCase(),
+        notes: body.notes ? String(body.notes).trim() : null,
+    }
+
+    const items = Array.isArray(body.items) ? body.items : []
+    return items.map((item) => ({
+        ...shared,
+        product_id: item.productId,
+        quantity: Number(item.quantity),
+        discount: Number(item.discount || 0),
+    }))
+}
+
 const mapDbError = (error, fallback = 'Database request failed.') => {
     if (error?.code === '42P01') {
         return 'Missing required tables. Run supabase/setup.sql in Supabase SQL Editor.'
+    }
+    if (error?.code === '42883' || error?.message?.includes('process_pos_sale')) {
+        return 'Missing POS checkout function. Run supabase/healthcare-pos.sql in Supabase SQL Editor.'
     }
     return error?.message || fallback
 }
@@ -90,72 +110,43 @@ export async function POST(request) {
         }
 
         const body = await request.json()
-        const payload = normalizeTransactionPayload(body)
-        const validationError = validateTransactionPayload(payload)
-        if (validationError) {
-            return Response.json({ success: false, error: validationError }, { status: 400 })
+        const cartPayload = Array.isArray(body.items) && body.items.length > 0
+            ? normalizeCartPayload(body)
+            : [normalizeTransactionPayload(body)]
+
+        if (cartPayload.length === 0) {
+            return Response.json({ success: false, error: 'At least one sale item is required.' }, { status: 400 })
         }
 
-        const { data: product, error: productError } = await supabaseAdmin
-            .from('products')
-            .select('id, name, stock, unit, price, is_active')
-            .eq('id', payload.product_id)
-            .single()
-
-        if (productError || !product) {
-            return Response.json({ success: false, error: 'Product not found.' }, { status: 404 })
+        for (const payload of cartPayload) {
+            const validationError = validateTransactionPayload(payload)
+            if (validationError) {
+                return Response.json({ success: false, error: validationError }, { status: 400 })
+            }
         }
 
-        if (!product.is_active) {
-            return Response.json({ success: false, error: 'Selected product is inactive.' }, { status: 400 })
-        }
-
-        if (payload.quantity > product.stock) {
-            return Response.json({ success: false, error: `Only ${product.stock} ${product.unit} available.` }, { status: 400 })
-        }
-
-        const unitPrice = Number(product.price)
-        const grossTotal = unitPrice * payload.quantity
-        const total = Math.max(grossTotal - payload.discount, 0)
-
-        const { data: createdTx, error: txError } = await supabaseAdmin
-            .from('transactions')
-            .insert([{
-                product_id: payload.product_id,
-                customer_id: payload.customer_id,
-                customer_name: payload.customer_name || null,
+        const { data, error } = await supabaseAdmin.rpc('process_pos_sale', {
+            sale_items: cartPayload.map((payload) => ({
+                productId: payload.product_id,
                 quantity: payload.quantity,
-                unit_price: unitPrice,
                 discount: payload.discount,
-                total,
-                payment_method: payload.payment_method,
-                notes: payload.notes,
-                created_by: auth.user.id,
-            }])
-            .select('*')
-            .single()
+            })),
+            sale_customer_id: cartPayload[0]?.customer_id || null,
+            sale_customer_name: cartPayload[0]?.customer_name || null,
+            sale_payment_method: cartPayload[0]?.payment_method || 'cash',
+            sale_notes: cartPayload[0]?.notes || null,
+            sale_created_by: auth.user.id,
+        })
 
-        if (txError) {
-            return Response.json({ success: false, error: mapDbError(txError) }, { status: 500 })
+        if (error) {
+            return Response.json({ success: false, error: mapDbError(error) }, { status: 500 })
         }
 
-        const { error: stockError } = await supabaseAdmin
-            .from('products')
-            .update({ stock: product.stock - payload.quantity })
-            .eq('id', payload.product_id)
-
-        if (stockError) {
-            await supabaseAdmin.from('transactions').delete().eq('id', createdTx.id)
-            return Response.json({ success: false, error: mapDbError(stockError) }, { status: 500 })
-        }
+        const createdTransactions = Array.isArray(data) ? data : []
 
         return Response.json({
             success: true,
-            data: {
-                ...createdTx,
-                product_name: product.name,
-                product_unit: product.unit,
-            },
+            data: createdTransactions.length === 1 ? createdTransactions[0] : createdTransactions,
         })
     } catch (error) {
         return Response.json({ success: false, error: error.message || 'Unexpected server error' }, { status: 500 })

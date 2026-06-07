@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { useAuth } from '@/context/AuthContext'
 import { useRouter, usePathname } from 'next/navigation'
 import Link from 'next/link'
-import { LayoutDashboard, Package, ShoppingCart, FileBarChart, Users, Menu, X, LogOut } from 'lucide-react'
+import { LayoutDashboard, Package, ShoppingCart, FileBarChart, Users, Menu, X, LogOut, Stethoscope } from 'lucide-react'
 
 export default function DashboardLayout({ children, sidebarSections = [], activeSection, onSectionChange, title }) {
     const { user, logout } = useAuth()
@@ -23,6 +23,8 @@ export default function DashboardLayout({ children, sidebarSections = [], active
 
     const menuItems = [
         { name: 'Dashboard', icon: LayoutDashboard, path: '/dashboard', roles: ['admin'] },
+        { name: 'POS', icon: ShoppingCart, path: '/pos', roles: ['admin', 'pharmacist'] },
+        { name: 'Doctor', icon: Stethoscope, path: '/doctor', roles: ['doctor'] },
         { name: 'Products', icon: Package, path: '/products', roles: ['admin'] },
         { name: 'Reports', icon: FileBarChart, path: '/reports', roles: ['admin'] },
         { name: 'Users', icon: Users, path: '/users', roles: ['admin'] },

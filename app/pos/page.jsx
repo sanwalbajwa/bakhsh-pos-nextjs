@@ -48,6 +48,7 @@ export default function POSPage() {
         discount: '0',
         notes: '',
     })
+    const [cartItems, setCartItems] = useState([])
     const [saleLoading, setSaleLoading] = useState(false)
     const [saleError, setSaleError] = useState('')
 
@@ -184,6 +185,9 @@ export default function POSPage() {
     const saleDiscount = Math.max(parseFloat(saleForm.discount || '0') || 0, 0)
     const saleSubTotal = selectedProduct ? Number(selectedProduct.price || 0) * saleQuantity : 0
     const saleTotal = Math.max(saleSubTotal - saleDiscount, 0)
+    const cartSubTotal = cartItems.reduce((sum, item) => sum + Number(item.price || 0) * Number(item.quantity || 0), 0)
+    const cartDiscount = cartItems.reduce((sum, item) => sum + Number(item.discount || 0), 0)
+    const cartTotal = Math.max(cartSubTotal - cartDiscount, 0)
 
     const inventoryProducts = useMemo(() => {
         return products.filter((product) =>
@@ -286,7 +290,17 @@ export default function POSPage() {
         }
     }
 
-    const handleSaleSubmit = async (event) => {
+    const resetSaleLine = () => {
+        setSaleForm((prev) => ({
+            ...prev,
+            productSearch: '',
+            productId: '',
+            quantity: '1',
+            discount: '0',
+        }))
+    }
+
+    const handleAddToCart = (event) => {
         event.preventDefault()
         setSaleError('')
 
@@ -310,24 +324,74 @@ export default function POSPage() {
             return
         }
 
+        const existingCartQuantity = cartItems
+            .filter((item) => String(item.productId) === String(selectedProduct.id))
+            .reduce((sum, item) => sum + Number(item.quantity || 0), 0)
+
+        if (existingCartQuantity + saleQuantity > selectedProduct.stock) {
+            setSaleError(`Only ${selectedProduct.stock} ${selectedProduct.unit} available`)
+            return
+        }
+
+        setCartItems((prev) => ([
+            ...prev,
+            {
+                lineId: `${selectedProduct.id}-${Date.now()}`,
+                productId: selectedProduct.id,
+                name: selectedProduct.name,
+                sku: selectedProduct.sku,
+                unit: selectedProduct.unit,
+                price: Number(selectedProduct.price || 0),
+                quantity: saleQuantity,
+                discount: saleDiscount,
+            },
+        ]))
+        resetSaleLine()
+    }
+
+    const removeCartItem = (lineId) => {
+        setCartItems((prev) => prev.filter((item) => item.lineId !== lineId))
+    }
+
+    const clearCart = () => {
+        setCartItems([])
+        setSaleError('')
+    }
+
+    const handleSaleSubmit = async (event) => {
+        event.preventDefault()
+        setSaleError('')
+
+        if (cartItems.length === 0) {
+            setSaleError('Add at least one product to the cart')
+            return
+        }
+
         try {
             setSaleLoading(true)
 
-            await apiRequest('/api/transactions', {
+            const payload = await apiRequest('/api/transactions', {
                 method: 'POST',
                 body: JSON.stringify({
-                    productId: selectedProduct.id,
-                    quantity: saleQuantity,
+                    items: cartItems.map((item) => ({
+                        productId: item.productId,
+                        quantity: item.quantity,
+                        discount: item.discount,
+                    })),
                     customerId: saleForm.customerId || null,
                     customerName: saleForm.customerName.trim() || null,
                     paymentMethod: saleForm.paymentMethod,
-                    discount: saleDiscount,
                     notes: saleForm.notes.trim() || null,
                 }),
             })
 
+            if (payload?.data) {
+                printReceipt(payload.data)
+            }
+
             await Promise.all([fetchTransactions(), fetchProducts()])
 
+            setCartItems([])
             setSaleForm({
                 productSearch: '',
                 productId: '',
@@ -386,6 +450,22 @@ export default function POSPage() {
         }
     }
 
+    const handleReturnTransaction = async (transactionId) => {
+        const reason = window.prompt('Enter return reason')
+        if (!reason?.trim()) return
+
+        try {
+            setTransactionsError('')
+            await apiRequest('/api/returns', {
+                method: 'POST',
+                body: JSON.stringify({ transactionId, reason: reason.trim() }),
+            })
+            await Promise.all([fetchTransactions(), fetchProducts()])
+        } catch (error) {
+            setTransactionsError(error.message || 'Failed to process return')
+        }
+    }
+
     const lowStockCount = products.filter((product) => product.stock <= product.reorder_level).length
     const activeProductsCount = products.filter((product) => product.is_active).length
     const totalRevenue = transactions.reduce((sum, item) => sum + Number(item.total || 0), 0)
@@ -398,12 +478,17 @@ export default function POSPage() {
         return sum + unitCost * Number(product.stock || 0)
     }, 0)
 
+    const DashboardMetric = ({ label, value, helper }) => (
+        <div className="rounded-lg border border-primary/10 bg-primary/5 p-6">
+            <p className="text-sm font-medium text-primary">{label}</p>
+            <p className="text-3xl font-bold text-primary mt-2">{value}</p>
+            <p className="text-xs text-gray-600 mt-1">{helper}</p>
+        </div>
+    )
+
     return (
         <ProtectedRoute allowedRoles={['admin', 'pharmacist']}>
             <DashboardLayout
-                sidebarSections={tabs}
-                activeSection={activeTab}
-                onSectionChange={setActiveTab}
                 title={`POS - ${activeTabLabel}`}
             >
                 <div className="space-y-6">
@@ -412,43 +497,68 @@ export default function POSPage() {
                         <p className="text-gray-600 mt-1">Manage pharmacy operations from one workspace</p>
                     </div>
 
+                    <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-2">
+                        <div className="grid grid-cols-2 gap-2 md:flex md:flex-wrap">
+                            {tabs.map((tab) => {
+                                const TabIcon = tab.icon
+                                const isActiveTab = activeTab === tab.id
+
+                                return (
+                                    <button
+                                        key={tab.id}
+                                        type="button"
+                                        onClick={() => setActiveTab(tab.id)}
+                                        className={`flex items-center justify-center gap-2 rounded-md px-4 py-2.5 text-sm font-semibold transition-colors ${
+                                            isActiveTab
+                                                ? 'bg-primary text-white shadow-sm'
+                                                : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+                                        }`}
+                                    >
+                                        <TabIcon className="h-4 w-4" />
+                                        <span>{tab.label}</span>
+                                    </button>
+                                )
+                            })}
+                        </div>
+                    </div>
+
                     <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
                         {activeTab === 'dashboard' && (
                             <div className="space-y-6">
                                 <h2 className="text-xl font-semibold text-gray-900">Sales Dashboard</h2>
                                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                                    <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-lg p-6">
-                                        <p className="text-sm text-blue-600 font-medium">Today&apos;s Sales</p>
-                                        <p className="text-3xl font-bold text-blue-900 mt-2">Rs {Math.round(todaySales).toLocaleString()}</p>
-                                        <p className="text-xs text-blue-600 mt-1">{transactions.length} transactions</p>
-                                    </div>
-                                    <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-lg p-6">
-                                        <p className="text-sm text-green-600 font-medium">Total Revenue</p>
-                                        <p className="text-3xl font-bold text-green-900 mt-2">Rs {Math.round(totalRevenue).toLocaleString()}</p>
-                                        <p className="text-xs text-green-600 mt-1">Recorded POS sales</p>
-                                    </div>
-                                    <div className="bg-gradient-to-br from-orange-50 to-orange-100 rounded-lg p-6">
-                                        <p className="text-sm text-orange-600 font-medium">Low Stock Items</p>
-                                        <p className="text-3xl font-bold text-orange-900 mt-2">{lowStockCount}</p>
-                                        <p className="text-xs text-orange-600 mt-1">Needs restock</p>
-                                    </div>
-                                    <div className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-lg p-6">
-                                        <p className="text-sm text-purple-600 font-medium">Avg. Order Value</p>
-                                        <p className="text-3xl font-bold text-purple-900 mt-2">Rs {Math.round(averageOrderValue).toLocaleString()}</p>
-                                        <p className="text-xs text-purple-600 mt-1">Per sale</p>
-                                    </div>
+                                    <DashboardMetric
+                                        label="Today's Sales"
+                                        value={`Rs ${Math.round(todaySales).toLocaleString()}`}
+                                        helper={`${transactions.length} transactions`}
+                                    />
+                                    <DashboardMetric
+                                        label="Total Revenue"
+                                        value={`Rs ${Math.round(totalRevenue).toLocaleString()}`}
+                                        helper="Recorded POS sales"
+                                    />
+                                    <DashboardMetric
+                                        label="Low Stock Items"
+                                        value={lowStockCount}
+                                        helper="Needs restock"
+                                    />
+                                    <DashboardMetric
+                                        label="Avg. Order Value"
+                                        value={`Rs ${Math.round(averageOrderValue).toLocaleString()}`}
+                                        helper="Per sale"
+                                    />
                                 </div>
 
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    <div className="bg-gray-50 rounded-lg p-5 border border-gray-200">
-                                        <p className="text-sm text-gray-600">Inventory Valuation</p>
-                                        <p className="text-2xl font-bold text-gray-900 mt-1">Rs {Math.round(inventoryValue).toLocaleString()}</p>
-                                        <p className="text-xs text-gray-500 mt-1">Based on current stock and cost/price</p>
+                                    <div className="bg-primary/5 rounded-lg p-5 border border-primary/10">
+                                        <p className="text-sm text-primary">Inventory Valuation</p>
+                                        <p className="text-2xl font-bold text-primary mt-1">Rs {Math.round(inventoryValue).toLocaleString()}</p>
+                                        <p className="text-xs text-gray-600 mt-1">Based on current stock and cost/price</p>
                                     </div>
-                                    <div className="bg-gray-50 rounded-lg p-5 border border-gray-200">
-                                        <p className="text-sm text-gray-600">Active Products</p>
-                                        <p className="text-2xl font-bold text-gray-900 mt-1">{activeProductsCount}</p>
-                                        <p className="text-xs text-gray-500 mt-1">Products available for sale</p>
+                                    <div className="bg-primary/5 rounded-lg p-5 border border-primary/10">
+                                        <p className="text-sm text-primary">Active Products</p>
+                                        <p className="text-2xl font-bold text-primary mt-1">{activeProductsCount}</p>
+                                        <p className="text-xs text-gray-600 mt-1">Products available for sale</p>
                                     </div>
                                 </div>
                             </div>
@@ -458,7 +568,7 @@ export default function POSPage() {
                             <div className="space-y-6">
                                 <h2 className="text-xl font-semibold text-gray-900">Transactions</h2>
 
-                                <form onSubmit={handleSaleSubmit} className="space-y-4 bg-gray-50 border border-gray-200 rounded-lg p-4">
+                                <form onSubmit={handleAddToCart} className="space-y-4 bg-gray-50 border border-gray-200 rounded-lg p-4">
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                                         <div>
                                             <label className="text-xs font-semibold text-gray-600 uppercase">Search Product</label>
@@ -575,9 +685,9 @@ export default function POSPage() {
                                     </div>
 
                                     <div className="bg-white border border-gray-200 rounded-lg p-3 text-sm text-gray-700 grid grid-cols-1 md:grid-cols-3 gap-2">
-                                        <p>Subtotal: <span className="font-semibold">Rs {saleSubTotal.toFixed(2)}</span></p>
-                                        <p>Discount: <span className="font-semibold">Rs {saleDiscount.toFixed(2)}</span></p>
-                                        <p>Total: <span className="font-semibold text-primary">Rs {saleTotal.toFixed(2)}</span></p>
+                                        <p>Line subtotal: <span className="font-semibold">Rs {saleSubTotal.toFixed(2)}</span></p>
+                                        <p>Line discount: <span className="font-semibold">Rs {saleDiscount.toFixed(2)}</span></p>
+                                        <p>Line total: <span className="font-semibold text-primary">Rs {saleTotal.toFixed(2)}</span></p>
                                     </div>
 
                                     <button
@@ -585,9 +695,82 @@ export default function POSPage() {
                                         disabled={saleLoading}
                                         className="px-5 py-2.5 bg-primary hover:bg-secondary text-white rounded-lg font-semibold disabled:opacity-60"
                                     >
-                                        {saleLoading ? 'Processing...' : 'Create Sale'}
+                                        Add to Cart
                                     </button>
                                 </form>
+
+                                <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+                                    <div className="px-4 py-3 border-b border-gray-200 flex items-center justify-between">
+                                        <h3 className="font-semibold text-gray-900">Current Cart</h3>
+                                        {cartItems.length > 0 && (
+                                            <button onClick={clearCart} className="text-sm text-red-600 hover:text-red-700 font-medium">
+                                                Clear
+                                            </button>
+                                        )}
+                                    </div>
+
+                                    {cartItems.length === 0 ? (
+                                        <div className="text-center py-8 text-sm text-gray-500">
+                                            Add products above to build a sale.
+                                        </div>
+                                    ) : (
+                                        <>
+                                            <div className="overflow-x-auto">
+                                                <table className="w-full">
+                                                    <thead className="bg-gray-50 border-b border-gray-200">
+                                                        <tr>
+                                                            <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Product</th>
+                                                            <th className="px-4 py-3 text-right text-xs font-semibold text-gray-600 uppercase">Qty</th>
+                                                            <th className="px-4 py-3 text-right text-xs font-semibold text-gray-600 uppercase">Price</th>
+                                                            <th className="px-4 py-3 text-right text-xs font-semibold text-gray-600 uppercase">Discount</th>
+                                                            <th className="px-4 py-3 text-right text-xs font-semibold text-gray-600 uppercase">Line Total</th>
+                                                            <th className="px-4 py-3 text-right text-xs font-semibold text-gray-600 uppercase">Action</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody className="divide-y divide-gray-200">
+                                                        {cartItems.map((item) => (
+                                                            <tr key={item.lineId}>
+                                                                <td className="px-4 py-3">
+                                                                    <p className="text-sm font-medium text-gray-900">{item.name}</p>
+                                                                    <p className="text-xs text-gray-500">{item.sku}</p>
+                                                                </td>
+                                                                <td className="px-4 py-3 text-sm text-gray-600 text-right">{item.quantity} {item.unit}</td>
+                                                                <td className="px-4 py-3 text-sm text-gray-600 text-right">Rs {item.price.toFixed(2)}</td>
+                                                                <td className="px-4 py-3 text-sm text-gray-600 text-right">Rs {item.discount.toFixed(2)}</td>
+                                                                <td className="px-4 py-3 text-sm font-semibold text-gray-900 text-right">
+                                                                    Rs {Math.max(item.price * item.quantity - item.discount, 0).toFixed(2)}
+                                                                </td>
+                                                                <td className="px-4 py-3 text-right">
+                                                                    <button
+                                                                        onClick={() => removeCartItem(item.lineId)}
+                                                                        className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                                                                    >
+                                                                        <Trash2 className="w-4 h-4" />
+                                                                    </button>
+                                                                </td>
+                                                            </tr>
+                                                        ))}
+                                                    </tbody>
+                                                </table>
+                                            </div>
+
+                                            <form onSubmit={handleSaleSubmit} className="px-4 py-4 bg-gray-50 border-t border-gray-200 space-y-3">
+                                                <div className="grid grid-cols-1 md:grid-cols-3 gap-2 text-sm text-gray-700">
+                                                    <p>Cart subtotal: <span className="font-semibold">Rs {cartSubTotal.toFixed(2)}</span></p>
+                                                    <p>Cart discount: <span className="font-semibold">Rs {cartDiscount.toFixed(2)}</span></p>
+                                                    <p>Cart total: <span className="font-semibold text-primary">Rs {cartTotal.toFixed(2)}</span></p>
+                                                </div>
+                                                <button
+                                                    type="submit"
+                                                    disabled={saleLoading}
+                                                    className="px-5 py-2.5 bg-primary hover:bg-secondary text-white rounded-lg font-semibold disabled:opacity-60"
+                                                >
+                                                    {saleLoading ? 'Processing...' : 'Checkout and Print Receipt'}
+                                                </button>
+                                            </form>
+                                        </>
+                                    )}
+                                </div>
 
                                 {saleError && <p className="text-sm text-red-600">{saleError}</p>}
                                 {transactionsError && <p className="text-sm text-red-600">{transactionsError}</p>}
@@ -626,13 +809,22 @@ export default function POSPage() {
                                                         <td className="px-4 py-3 text-sm text-gray-600">{item.quantity}</td>
                                                         <td className="px-4 py-3 text-sm font-semibold text-gray-900">Rs {Number(item.total || 0).toFixed(2)}</td>
                                                         <td className="px-4 py-3 text-right">
-                                                            <button
-                                                                onClick={() => printReceipt(item)}
-                                                                className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors inline-flex items-center gap-1"
-                                                                title="Print Receipt"
-                                                            >
-                                                                <Printer className="w-4 h-4" />
-                                                            </button>
+                                                            <div className="flex items-center justify-end gap-2">
+                                                                <button
+                                                                    onClick={() => printReceipt(item)}
+                                                                    className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors inline-flex items-center gap-1"
+                                                                    title="Print Receipt"
+                                                                >
+                                                                    <Printer className="w-4 h-4" />
+                                                                </button>
+                                                                <button
+                                                                    onClick={() => handleReturnTransaction(item.id)}
+                                                                    className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors inline-flex items-center gap-1"
+                                                                    title="Return Sale"
+                                                                >
+                                                                    Return
+                                                                </button>
+                                                            </div>
                                                         </td>
                                                     </tr>
                                                 ))}

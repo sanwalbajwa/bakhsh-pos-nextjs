@@ -30,9 +30,9 @@ export default function DashboardPage() {
                     Authorization: `Bearer ${accessToken}`,
                 },
             })
-            const result = await response.json()
+            const result = await response.json().catch(() => ({}))
             
-            if (result.success) {
+            if (response.ok && result.success) {
                 setStats(result.data)
             } else {
                 throw new Error(result.error || 'Failed to load dashboard data')
@@ -48,7 +48,7 @@ export default function DashboardPage() {
         fetchDashboardData()
     }, [fetchDashboardData])
 
-    const StatCard = ({ icon: Icon, title, value, color, subtext }) => (
+    const StatCard = ({ icon: Icon, title, value, subtext }) => (
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 hover:shadow-md transition-shadow">
             <div className="flex items-center justify-between">
                 <div>
@@ -56,7 +56,7 @@ export default function DashboardPage() {
                     <p className="text-3xl font-bold text-gray-900">{value}</p>
                     {subtext && <p className="text-xs text-gray-500 mt-1">{subtext}</p>}
                 </div>
-                <div className={`p-4 rounded-full ${color}`}>
+                <div className="p-4 rounded-full bg-primary">
                     <Icon className="w-6 h-6 text-white" />
                 </div>
             </div>
@@ -86,28 +86,24 @@ export default function DashboardPage() {
                             icon={DollarSign}
                             title="Total Revenue"
                             value={`Rs ${stats.totalRevenue.toLocaleString()}`}
-                            color="bg-green-500"
                             subtext="All time sales"
                         />
                         <StatCard
                             icon={Package}
                             title="Total Products"
                             value={stats.totalProducts}
-                            color="bg-blue-500"
                             subtext="Active products"
                         />
                         <StatCard
                             icon={AlertTriangle}
                             title="Low Stock"
                             value={stats.lowStockCount}
-                            color="bg-orange-500"
                             subtext="Need reordering"
                         />
                         <StatCard
                             icon={Users}
                             title="Total Users"
                             value={stats.totalUsers}
-                            color="bg-purple-500"
                             subtext="Admin & Pharmacists"
                         />
                     </div>
